@@ -4,8 +4,10 @@ import anndata as ad
 import numpy as np
 import logging
 import argparse
+import sys
 import os
 import time
+import gzip
 import json
 
 
@@ -234,7 +236,7 @@ class FAMLI2():
             self.bitscore_filter_iteration()
             post_n_aln = self.aln_ad.X.sum()
             logging.info(
-                f'{ix}: {pre_n_aln} to {post_n_aln}'
+                f'Iteration {ix}: {pre_n_aln:,d} to {post_n_aln:,d} Alignments.'
             )
             if pre_n_aln == post_n_aln:
                 break
@@ -266,7 +268,7 @@ class FAMLI2():
         self.aln_ad.var['unique'] = self.aln_ad.var.n_subj_per_read == 1
         self.aln_ad.var['pruned'] = self.aln_ad.var.n_subj_per_read == 0
         logging.info(
-            f'There are {self.aln_ad.var.multimapped.sum()} multimapped, {self.aln_ad.var.unique.sum()} uniquely mapped reads.'
+            f'There are {self.aln_ad.var.multimapped.sum():,d} multimapped, {self.aln_ad.var.unique.sum():,d} uniquely mapped reads. {self.aln_ad.var.pruned.sum():,d} reads pruned.'
         )
         self.aln_ad.obs['nreads'] = np.ravel(self.aln_ad.X.sum(axis=1))
 
@@ -344,7 +346,7 @@ def load_diamond_blast6(file):
             "slen"
         ]
     )
-    logging.info(f"Loading of {len(aln)} alignments complete")
+    logging.info(f"Loading of {len(aln):,d} alignments complete")
     subjects = list(aln.sseqid.unique())
     subject_i = {
         s: i
@@ -358,7 +360,7 @@ def load_diamond_blast6(file):
     }
     aln['query_i'] = aln.qseqid.apply(query_i.get)
     logging.info(
-        f'There were {len(subjects)} protein-coding sequences and {len(queries)} reads with alignments'
+        f'There were {len(subjects):,d} protein-coding sequences and {len(queries):,d} reads with alignments'
     )
     slens = aln.groupby('sseqid').max(numeric_only=True).slen.loc[
         subjects
