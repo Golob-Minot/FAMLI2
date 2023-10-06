@@ -353,40 +353,40 @@ def load_diamond_blast6_lowmem(
         fieldnames=columns,
         delimiter='\t'
     )
-    logging.info("First pass to load in query IDs")
+    logging.info("Load alignments into memory")
+    aln = [
+        (
+            r['qseqid'], # 0
+            r['sseqid'], # 1
+            int(r['slen']), # 2
+            int(r['sstart']), # 3
+            int(r['send']), # 4
+            float(r['bitscore']) # 5
+        ) for r in fr
+    ]
+    logging.info(f"Loading of {len(aln):,d} alignments complete")
+    logging.info("Load in queries")
     queries = sorted({
-        r['qseqid'] for r in fr
+        r[0] for r in aln
     })
     query_i = {
         s: i
         for (i, s) in enumerate(queries)
     }
 
-    logging.info("Second Pass to load in subject IDs")
-    fh.seek(0)
-    fr = csv.DictReader(
-        fh,
-        fieldnames=columns,
-        delimiter='\t'
-    )
+    logging.info("Load in subject IDs")
     subjects = sorted({
-        r['sseqid'] for r in fr
+        r[1] for r in aln
     })
     subject_i = {
         s: i
         for (i, s) in enumerate(subjects)
     }
 
-    logging.info("Third pass to read in subject lengths")
-    fh.seek(0)
-    fr = csv.DictReader(
-        fh,
-        fieldnames=columns,
-        delimiter='\t'
-    )
+    logging.info("Subject Lengths ordering..")
     slen_dict = {
-        r['sseqid']: r['slen']
-        for r in fr
+        r[1]: r[3]
+        for r in aln
     }
     slens = [
         int(slen_dict.get(s, 0))
@@ -394,31 +394,24 @@ def load_diamond_blast6_lowmem(
     ]
     logging.info(
         f'There were {len(subjects):,d} protein-coding sequences and {len(queries):,d} reads with alignments'
-    )    
-    logging.info("Fourth pass to read in alignments")
-    fh.seek(0)
-    fr = csv.DictReader(
-        fh,
-        fieldnames=columns,
-        delimiter='\t'
     )
-    alignments = [
-        (
-            subject_i.get(r['sseqid']),
-            query_i.get(r['qseqid']),
-            r['sstart'],
-            r['send'],
-            r['bitscore']
-        )
-        for r in fr
-    ]
-    logging.info(f"Loading of {len(alignments):,d} alignments complete")
+
     logging.info("Building FAMLI2 object")
     return FAMLI2(
         subjects=subjects,
         queries=queries,
         slens=slens,
-        alignments=alignments
+        alignments=[
+            (
+                subject_i.get(r[1]),
+                query_i.get(r[0]),
+                r[3],
+                r[4],
+                r[5],
+            )
+            for r in aln
+
+        ]
     )
 
 
