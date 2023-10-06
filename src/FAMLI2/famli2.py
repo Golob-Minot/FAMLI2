@@ -356,12 +356,12 @@ def load_diamond_blast6_lowmem(
     logging.info("Load alignments into memory")
     aln = [
         (
-            r['qseqid'], # 0
-            r['sseqid'], # 1
-            int(r['slen']), # 2
-            int(r['sstart']), # 3
-            int(r['send']), # 4
-            float(r['bitscore']) # 5
+            r['qseqid'],  # 0
+            r['sseqid'],  # 1
+            int(r['slen']),  # 2
+            int(r['sstart']),  # 3
+            int(r['send']),  # 4
+            float(r['bitscore'])  # 5
         ) for r in fr
     ]
     logging.info(f"Loading of {len(aln):,d} alignments complete")
