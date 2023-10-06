@@ -9,6 +9,7 @@ import os
 import time
 import gzip
 import json
+import csv
 
 
 class FAMLI2():
@@ -324,6 +325,103 @@ class FAMLI2():
         return self.aln_ad.__repr__()
 
 
+def load_diamond_blast6_lowmem(
+        file,
+        columns=[
+            "qseqid",
+            "sseqid",
+            "pident",
+            "length",
+            "mismatch",
+            "gapopen",
+            "qstart",
+            "qend",
+            "sstart",
+            "send",
+            "evalue",
+            "bitscore",
+            "qlen",
+            "slen"
+        ]):
+    logging.info("Attempting to open alignment file")
+    if file.endswith('.gz') or file.endswith('.gzip'):
+        fh = gzip.open(file, 'rt')
+    else:
+        fh = open(file, 'rt')
+    fr = csv.DictReader(
+        fh,
+        fieldnames=columns,
+        delimiter='\t'
+    )
+    logging.info("First pass to load in query IDs")
+    queries = sorted({
+        r['qseqid'] for r in fr
+    })
+    query_i = {
+        s: i
+        for (i, s) in enumerate(queries)
+    }
+
+    logging.info("Second Pass to load in subject IDs")
+    fh.seek(0)
+    fr = csv.DictReader(
+        fh,
+        fieldnames=columns,
+        delimiter='\t'
+    )
+    subjects = sorted({
+        r['sseqid'] for r in fr
+    })
+    subject_i = {
+        s: i
+        for (i, s) in enumerate(subjects)
+    }
+
+    logging.info("Third pass to read in subject lengths")
+    fh.seek(0)
+    fr = csv.DictReader(
+        fh,
+        fieldnames=columns,
+        delimiter='\t'
+    )
+    slen_dict = {
+        r['sseqid']: r['slen']
+        for r in fr
+    }
+    slens = [
+        int(slen_dict.get(s, 0))
+        for s in subjects
+    ]
+    logging.info(
+        f'There were {len(subjects):,d} protein-coding sequences and {len(queries):,d} reads with alignments'
+    )    
+    logging.info("Fourth pass to read in alignments")
+    fh.seek(0)
+    fr = csv.DictReader(
+        fh,
+        fieldnames=columns,
+        delimiter='\t'
+    )
+    alignments = [
+        (
+            subject_i.get(r['sseqid']),
+            query_i.get(r['qseqid']),
+            r['sstart'],
+            r['send'],
+            r['bitscore']
+        )
+        for r in fr
+    ]
+    logging.info(f"Loading of {len(alignments):,d} alignments complete")
+    logging.info("Building FAMLI2 object")
+    return FAMLI2(
+        subjects=subjects,
+        queries=queries,
+        slens=slens,
+        alignments=alignments
+    )
+
+
 def load_diamond_blast6(file):
     logging.info("Using pandas to load blast6 format alignment")
     aln = pd.read_csv(
@@ -436,7 +534,7 @@ def main():
     rootLogger.addHandler(consoleHandler)
 
     logging.info("Attemping to load input file")
-    famli2 = load_diamond_blast6(args.input)
+    famli2 = load_diamond_blast6_lowmem(args.input)
 
     logging.info("Starting FAMLI (v1) filter")
     famli2.run_famli()
