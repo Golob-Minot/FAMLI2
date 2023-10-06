@@ -60,22 +60,11 @@ classifiers = [  # Optional
   "Programming Language :: Python :: 3 :: Only",
 ]
 
-# This field lists other packages that your project depends on to run.
-# Any package you put here will be installed by pip when your project is
-# installed, so they must be valid existing projects.
-#
-# For an analysis of this field vs pip's requirements files see:
-# https://packaging.python.org/discussions/install-requires-vs-requirements/
-dependencies = [ # Optional
-  "pandas",
-<<<<<<< HEAD
-  'anndata',
-=======
-  'annadata',
->>>>>>> 92f548316f0a142003ca2af93b3d85aa2c674aa1
-  'scipy',
-  'numpy',
-
+dependencies = [ 
+  'anndata>=0.9.2',
+  'numpy>=1.25.2',
+  "pandas>=2.1.1",
+  'scipy>=1.11.3',
 ]
 
 
@@ -97,11 +86,7 @@ dependencies = [ # Optional
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.
 [project.scripts]  # Optional
-<<<<<<< HEAD
 famli2 = "FAMLI2.famli2:main"
-=======
-famli2 = "famli2:main"
->>>>>>> 92f548316f0a142003ca2af93b3d85aa2c674aa1
 
 # This is configuration specific to the `setuptools` build backend.
 # If you are using a different build backend, you will need to change this.
