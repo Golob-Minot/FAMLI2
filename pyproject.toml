@@ -68,7 +68,11 @@ classifiers = [  # Optional
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [ # Optional
   "pandas",
+<<<<<<< HEAD
   'anndata',
+=======
+  'annadata',
+>>>>>>> 92f548316f0a142003ca2af93b3d85aa2c674aa1
   'scipy',
   'numpy',
 
@@ -93,7 +97,11 @@ dependencies = [ # Optional
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.
 [project.scripts]  # Optional
+<<<<<<< HEAD
 famli2 = "FAMLI2.famli2:main"
+=======
+famli2 = "famli2:main"
+>>>>>>> 92f548316f0a142003ca2af93b3d85aa2c674aa1
 
 # This is configuration specific to the `setuptools` build backend.
 # If you are using a different build backend, you will need to change this.
