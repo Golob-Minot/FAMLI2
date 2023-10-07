@@ -486,6 +486,10 @@ def main():
     parser.add_argument("--output",
                         type=str,
                         help="Location for output JSON file.")
+    parser.add_argument("--threads",
+                        type=int,
+                        default=1,
+                        help="Number of threads to use. Default = 1")
     parser.add_argument("--logfile",
                         type=str,
                         help="""(Optional) Write log to this file.""")
@@ -506,7 +510,9 @@ def main():
 
     start_time = time.time()
 
-    assert os.path.exists(args.input)
+    os.environ['OMP_NUM_THREADS'] = str(
+        int(args.threads)
+    )
 
     # Set up logging
     logFormatter = logging.Formatter(
