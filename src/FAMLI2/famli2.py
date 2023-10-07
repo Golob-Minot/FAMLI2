@@ -513,7 +513,18 @@ def main():
     os.environ['OMP_NUM_THREADS'] = str(
         int(args.threads)
     )
-
+    os.environ["OPENBLAS_NUM_THREADS"] =  = str(
+        int(args.threads)
+    )
+    os.environ["MKL_NUM_THREADS"] =  = str(
+        int(args.threads)
+    )
+    os.environ["VECLIB_MAXIMUM_THREADS"] =  = str(
+        int(args.threads)
+    )
+    os.environ["NUMEXPR_NUM_THREADS"] =  = str(
+        int(args.threads)
+    )
     # Set up logging
     logFormatter = logging.Formatter(
         '%(asctime)s %(levelname)-8s [FAMLI2] %(message)s'
