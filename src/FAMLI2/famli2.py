@@ -348,20 +348,25 @@ def load_diamond_blast6_lowmem(
         fh = gzip.open(file, 'rt')
     else:
         fh = open(file, 'rt')
-    fr = csv.DictReader(
+    fr = csv.reader(
         fh,
-        fieldnames=columns,
         delimiter='\t'
     )
+    qseqid_j = columns.index('qseqid')
+    sseqid_j = columns.index('sseqid')
+    slen_j = columns.index('slen')
+    sstart_j = columns.index('sstart')
+    send_j = columns.index('send')
+    bitscore_j = columns.index('bitscore')
     logging.info("Load alignments into memory")
     aln = [
         (
-            r['qseqid'],  # 0
-            r['sseqid'],  # 1
-            int(r['slen']),  # 2
-            int(r['sstart']),  # 3
-            int(r['send']),  # 4
-            float(r['bitscore'])  # 5
+            r[qseqid_j],  # 0
+            r[sseqid_j],  # 1
+            int(r[slen_j]),  # 2
+            int(r[sstart_j]),  # 3
+            int(r[send_j]),  # 4
+            float(r[bitscore_j])  # 5
         ) for r in fr
     ]
     logging.info(f"Loading of {len(aln):,d} alignments complete")
@@ -513,16 +518,16 @@ def main():
     os.environ['OMP_NUM_THREADS'] = str(
         int(args.threads)
     )
-    os.environ["OPENBLAS_NUM_THREADS"] =  = str(
+    os.environ["OPENBLAS_NUM_THREADS"] =  str(
         int(args.threads)
     )
-    os.environ["MKL_NUM_THREADS"] =  = str(
+    os.environ["MKL_NUM_THREADS"] =  str(
         int(args.threads)
     )
-    os.environ["VECLIB_MAXIMUM_THREADS"] =  = str(
+    os.environ["VECLIB_MAXIMUM_THREADS"] =  str(
         int(args.threads)
     )
-    os.environ["NUMEXPR_NUM_THREADS"] =  = str(
+    os.environ["NUMEXPR_NUM_THREADS"] = str(
         int(args.threads)
     )
     # Set up logging
