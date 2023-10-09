@@ -21,9 +21,12 @@ def make_subject_coverage_ti(
     sends: ti.types.ndarray(dtype=ti.i32, ndim=1),
 ):
     # Make the cover-o-gram
-    for i in ti.grouped(sstarts):
-        for j in range(sstarts[i], sends[i]):
-            scov[j] += 1
+    for i in range(sstarts.shape[0]):
+        # LOTS of checks to avoid some nasty issues
+        if (sstarts[i] < sends[i]) and (sends[i] < scov.shape[0]) and (sstarts[i] < scov.shape[0]) and (sstarts[i] >= 0) and (sends[i] >= 0):
+            for j in range(sstarts[i], sends[i]):
+                scov[j] += 1
+
     # Returned by reference
 
 
@@ -158,30 +161,18 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-        filtered_start_end = [
-            (s, e) for 
-            (s, e) in
-            zip(
-                np.ravel(sstarts.astype(np.int32).toarray()),
-                np.ravel(sends.astype(np.int32).toarray())
-            ) if e > s
-        ]
-        if len(filtered_start_end) == 0:
+        # Densify and flatten
+        sstarts = np.ravel(sstarts.astype(np.int32).toarray())
+        sends = np.ravel(sends.astype(np.int32).toarray())
+
+        if len(sstarts) == 0:
             return False
         # Implicit else
-        ti_starts = ti.ndarray(shape=(len(filtered_start_end),), dtype=ti.int32)
-        ti_ends = ti.ndarray(shape=(len(filtered_start_end),), dtype=ti.int32)
-        ti_starts.from_numpy(np.array([
-            v[0] for v in filtered_start_end
-        ]))
-        ti_ends.from_numpy(np.array([
-            v[1] for v in filtered_start_end
-        ]))        
         s_cov_ti = ti.ndarray(shape=(slen,), dtype=ti.int32)
         make_subject_coverage_ti(
             s_cov_ti,
-            ti_starts,
-            ti_ends
+            sstarts,
+            sends
         )
         s_cov = s_cov_ti.to_numpy()
         # Trim off the ends IF the subject is long enough
