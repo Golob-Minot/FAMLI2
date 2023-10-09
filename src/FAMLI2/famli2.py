@@ -10,6 +10,21 @@ import time
 import gzip
 import json
 import csv
+import taichi as ti
+
+
+# Taichi methods...
+@ti.kernel
+def make_subject_coverage_ti(
+    scov: ti.types.ndarray(dtype=ti.i32, ndim=1),
+    sstarts: ti.types.ndarray(dtype=ti.i32, ndim=1),
+    sends: ti.types.ndarray(dtype=ti.i32, ndim=1),
+):
+    # Make the cover-o-gram
+    for i in ti.grouped(sstarts):
+        for j in range(sstarts[i], sends[i]):
+            scov[j] += 1
+    # Returned by reference
 
 
 class FAMLI2():
@@ -60,7 +75,7 @@ class FAMLI2():
                     len(queries),
                 ),
                 dtype=bool
-            ).tocsr(),
+            ).todense(),
             obs=pd.DataFrame(index=subjects),
             var=pd.DataFrame(index=queries),
             dtype=bool,
@@ -127,24 +142,10 @@ class FAMLI2():
         # convert to dense as this point
         sstarts = np.ravel(sstarts.astype(int).toarray())
         sends = np.ravel(sends.astype(int).toarray())
-        # Build up our boolean coverageograms for each read for this subject.
-        s_bool_cov = [
-            self.make_bool_cov(slen, ss, se)
-            for (ss, se) in zip(
-                sstarts, sends
-            )
-            if se != ss
-        ]
-        # Lots of edge case checking
 
-        if len(s_bool_cov) == 1:
-            # IF it's only one query for this subject..
-            s_cov = s_bool_cov[0].astype(int)
-        elif len(s_bool_cov) > 1:
-            # More than one query for this subject
-            s_cov = np.sum(s_bool_cov, axis=0)
-        else:
-            s_cov = np.zeros(slen)
+        s_cov = np.zeros(slen)
+        for i in range(len(sstarts)):
+            s_cov[sstarts[i]:sends[i]] += 1
 
         return s_cov
 
@@ -158,19 +159,20 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-        s_cov = self.make_subject_coverage(
-            slen,
-            sstarts,
-            sends
+        s_cov = np.zeros(int(slen), dtype=int)
+        make_subject_coverage_ti(
+            s_cov,
+            np.ravel(sstarts.astype(int).toarray()),
+            np.ravel(sends.astype(int).toarray())
         )
-        if s_cov.max() == 0:
-            return False
-        # Implicit else
         # Trim off the ends IF the subject is long enough
         if len(s_cov) > strim_3 + strim_5 + 10:
             s_cov = s_cov[strim_5: -strim_3]
+        if s_cov.max() == 0:
+            return False
+        # Implicit else
         # Get our filter result (is there some coverage and is it above zero)
-        s_filter_res = (np.mean(s_cov) > 0) & (np.std(s_cov) / np.mean(s_cov) <= sd_mean_cutoff)
+        s_filter_res = (np.std(s_cov) / np.mean(s_cov)) <= sd_mean_cutoff
         return s_filter_res
 
     def coverage_filter(self):
@@ -191,12 +193,14 @@ class FAMLI2():
                 self.aln_ad.layers['send'],
             )
         ]
+        logging.info("Applying coverage filter results")
+
         # Do a bit of conversion here to deal with which sparse formats work the best
-        new_mask = self.aln_ad.X.tolil()
-        new_mask[
+
+        self.aln_ad.X[
             ~self.aln_ad.obs.coverage_filter_pass
         ] = False
-        self.aln_ad.X = new_mask.tocsr()
+
         logging.info("Completed Coverage Filter")
         self.apply_mask()
         self.update_mapping_state()
@@ -219,9 +223,9 @@ class FAMLI2():
         max_score_per_query = max_score_per_query.clip(
             min=max_score_per_query[max_score_per_query > 0].min() / 10
         )
-        self.aln_ad.X = self.aln_ad.X.multiply(
+        self.aln_ad.X = (self.aln_ad.X & (
             self.aln_ad.layers['aln_score'].multiply(1 / max_score_per_query) >= self.ALN_SCORE_SCALE
-        )
+        ).todense())
         self.apply_mask()
         self.update_mapping_state()
 
@@ -276,26 +280,31 @@ class FAMLI2():
     def apply_mask(self):
         logging.info("Applying mask to alignments")
         # And then apply our mask...
-        self.aln_ad.layers['bitscore'] = self.aln_ad.layers['bitscore'].multiply(self.aln_ad.X)
-        self.aln_ad.layers['sstart'] = self.aln_ad.layers['sstart'].multiply(self.aln_ad.X)
-        self.aln_ad.layers['send'] = self.aln_ad.layers['send'].multiply(self.aln_ad.X)
+
+        self.aln_ad.layers['bitscore'] = self.aln_ad.layers['bitscore'].multiply(self.aln_ad.X).tocsr()
+        self.aln_ad.layers['sstart'] = self.aln_ad.layers['sstart'].multiply(self.aln_ad.X).tocsr()
+        self.aln_ad.layers['send'] = self.aln_ad.layers['send'].multiply(self.aln_ad.X).tocsr()
 
     def output_list(self):
+        logging.info("Filtering down to the final alignment")
         final_aln = self.aln_ad[self.aln_ad.obs.nreads > 0]
 
+        logging.info("Building final cover-o-grams")
         final_cov = [
-            self.make_subject_coverage(
-                slen,
-                sstarts,
-                sends,
-            )
-            for slen, sstarts, sends in zip(
-                final_aln.obs.slen,
-                final_aln.layers['sstart'],
-                final_aln.layers['send'],
-            )
+            np.zeros(slen, dtype=int)
+            for slen in final_aln.obs.slen
         ]
-
+        for scov, sstarts, sends in zip(
+            final_cov,
+            final_aln.layers['sstart'],
+            final_aln.layers['send'],
+        ):
+            make_subject_coverage_ti(
+                scov,
+                np.ravel(sstarts.astype(int).toarray()),
+                np.ravel(sends.astype(int).toarray())
+            )
+        logging.info("And returning results...")
         return [
             {
                 'id': subj,
@@ -518,17 +527,20 @@ def main():
     os.environ['OMP_NUM_THREADS'] = str(
         int(args.threads)
     )
-    os.environ["OPENBLAS_NUM_THREADS"] =  str(
+    os.environ["OPENBLAS_NUM_THREADS"] = str(
         int(args.threads)
     )
-    os.environ["MKL_NUM_THREADS"] =  str(
+    os.environ["MKL_NUM_THREADS"] = str(
         int(args.threads)
     )
-    os.environ["VECLIB_MAXIMUM_THREADS"] =  str(
+    os.environ["VECLIB_MAXIMUM_THREADS"] = str(
         int(args.threads)
     )
     os.environ["NUMEXPR_NUM_THREADS"] = str(
         int(args.threads)
+    )
+    ti.init(
+        cpu_max_num_threads=int(args.threads)
     )
     # Set up logging
     logFormatter = logging.Formatter(
