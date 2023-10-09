@@ -158,11 +158,30 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
+        filtered_start_end = [
+            (s, e) for 
+            (s, e) in
+            zip(
+                np.ravel(sstarts.astype(np.int32).toarray()),
+                np.ravel(sends.astype(np.int32).toarray())
+            ) if e > s
+        ]
+        if len(filtered_start_end) == 0:
+            return False
+        # Implicit else
+        ti_starts = ti.ndarray(shape=(len(filtered_start_end),), dtype=ti.int32)
+        ti_ends = ti.ndarray(shape=(len(filtered_start_end),), dtype=ti.int32)
+        ti_starts.from_numpy(np.array([
+            v[0] for v in filtered_start_end
+        ]))
+        ti_ends.from_numpy(np.array([
+            v[1] for v in filtered_start_end
+        ]))        
         s_cov_ti = ti.ndarray(shape=(slen,), dtype=ti.int32)
         make_subject_coverage_ti(
             s_cov_ti,
-            np.ravel(sstarts.astype(np.int32).toarray()),
-            np.ravel(sends.astype(np.int32).toarray())
+            ti_starts,
+            ti_ends
         )
         s_cov = s_cov_ti.to_numpy()
         # Trim off the ends IF the subject is long enough
