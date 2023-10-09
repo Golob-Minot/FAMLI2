@@ -24,7 +24,6 @@ def make_subject_coverage_ti(
     for i in ti.grouped(sstarts):
         for j in range(sstarts[i], sends[i]):
             scov[j] += 1
-    print("HELLO")
     # Returned by reference
 
 
@@ -159,23 +158,21 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-        s_cov = np.zeros(int(slen), dtype=np.int32)
+        s_cov_ti = ti.ndarray(shape=(slen,), dtype=ti.int32)
         make_subject_coverage_ti(
-            s_cov,
+            s_cov_ti,
             np.ravel(sstarts.astype(np.int32).toarray()),
             np.ravel(sends.astype(np.int32).toarray())
         )
-        print("goodbye")
+        s_cov = s_cov_ti.to_numpy()
         # Trim off the ends IF the subject is long enough
         if len(s_cov) > strim_3 + strim_5 + 10:
-            s_cov_trim = s_cov[strim_5: -strim_3]
-        else:
-            s_cov_trim = s_cov
-        if s_cov_trim.max() == 0:
+            s_cov = s_cov[strim_5: -strim_3]
+        if s_cov.max() == 0:
             return False
         # Implicit else
         # Get our filter result (is there some coverage and is it above zero)
-        s_filter_res = (np.std(s_cov_trim) / np.mean(s_cov_trim)) <= sd_mean_cutoff
+        s_filter_res = (np.std(s_cov) / np.mean(s_cov)) <= sd_mean_cutoff
         return s_filter_res
 
     def coverage_filter(self):
@@ -293,20 +290,21 @@ class FAMLI2():
         final_aln = self.aln_ad[self.aln_ad.obs.nreads > 0]
 
         logging.info("Building final cover-o-grams")
-        final_cov = [
-            np.zeros(slen, dtype=np.int32)
-            for slen in final_aln.obs.slen
-        ]
-        for scov, sstarts, sends in zip(
-            final_cov,
+        final_cov = [None] * len(final_aln)
+        for i, slen, sstarts, sends in zip(
+            range(len(final_aln)),
+            final_aln.obs.slen,
             final_aln.layers['sstart'],
             final_aln.layers['send'],
         ):
+            scov_ti = ti.ndarray(shape=(slen,), dtype=ti.int32)
             make_subject_coverage_ti(
-                scov,
+                scov_ti,
                 np.ravel(sstarts.astype(np.int32).toarray()),
                 np.ravel(sends.astype(np.int32).toarray())
             )
+            final_cov[i] = scov_ti.to_numpy()
+
         logging.info("And returning results...")
         return [
             {
