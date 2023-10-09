@@ -78,7 +78,6 @@ class FAMLI2():
             ).todense(),
             obs=pd.DataFrame(index=subjects),
             var=pd.DataFrame(index=queries),
-            dtype=bool,
         )
         # X is a boolean matrix of the current query-subject alignments
         logging.info("Adding bitscores")
@@ -143,7 +142,7 @@ class FAMLI2():
         sstarts = np.ravel(sstarts.astype(int).toarray())
         sends = np.ravel(sends.astype(int).toarray())
 
-        s_cov = np.zeros(slen)
+        s_cov = np.zeros(slen, dtype=np.int32)
         for i in range(len(sstarts)):
             s_cov[sstarts[i]:sends[i]] += 1
 
@@ -159,11 +158,11 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-        s_cov = np.zeros(int(slen), dtype=int)
+        s_cov = np.zeros(int(slen), dtype=np.int32)
         make_subject_coverage_ti(
             s_cov,
-            np.ravel(sstarts.astype(int).toarray()),
-            np.ravel(sends.astype(int).toarray())
+            np.ravel(sstarts.astype(np.int32).toarray()),
+            np.ravel(sends.astype(np.int32).toarray())
         )
         # Trim off the ends IF the subject is long enough
         if len(s_cov) > strim_3 + strim_5 + 10:
@@ -291,7 +290,7 @@ class FAMLI2():
 
         logging.info("Building final cover-o-grams")
         final_cov = [
-            np.zeros(slen, dtype=int)
+            np.zeros(slen, dtype=np.int32)
             for slen in final_aln.obs.slen
         ]
         for scov, sstarts, sends in zip(
@@ -301,8 +300,8 @@ class FAMLI2():
         ):
             make_subject_coverage_ti(
                 scov,
-                np.ravel(sstarts.astype(int).toarray()),
-                np.ravel(sends.astype(int).toarray())
+                np.ravel(sstarts.astype(np.int32).toarray()),
+                np.ravel(sends.astype(np.int32).toarray())
             )
         logging.info("And returning results...")
         return [
