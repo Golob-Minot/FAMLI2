@@ -24,6 +24,7 @@ def make_subject_coverage_ti(
     for i in ti.grouped(sstarts):
         for j in range(sstarts[i], sends[i]):
             scov[j] += 1
+    print("HELLO")
     # Returned by reference
 
 
@@ -164,14 +165,17 @@ class FAMLI2():
             np.ravel(sstarts.astype(np.int32).toarray()),
             np.ravel(sends.astype(np.int32).toarray())
         )
+        print("goodbye")
         # Trim off the ends IF the subject is long enough
         if len(s_cov) > strim_3 + strim_5 + 10:
-            s_cov = s_cov[strim_5: -strim_3]
-        if s_cov.max() == 0:
+            s_cov_trim = s_cov[strim_5: -strim_3]
+        else:
+            s_cov_trim = s_cov
+        if s_cov_trim.max() == 0:
             return False
         # Implicit else
         # Get our filter result (is there some coverage and is it above zero)
-        s_filter_res = (np.std(s_cov) / np.mean(s_cov)) <= sd_mean_cutoff
+        s_filter_res = (np.std(s_cov_trim) / np.mean(s_cov_trim)) <= sd_mean_cutoff
         return s_filter_res
 
     def coverage_filter(self):
