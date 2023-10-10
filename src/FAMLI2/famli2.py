@@ -22,11 +22,10 @@ def make_subject_coverage_ti(
 ):
     # Make the cover-o-gram
     for i in range(sstarts.shape[0]):
-        # LOTS of checks to avoid some nasty issues
-        if (sstarts[i] < sends[i]) and (sends[i] < scov.shape[0]) and (sstarts[i] < scov.shape[0]) and (sstarts[i] >= 0) and (sends[i] >= 0):
+        # Quite a few sanity / safety checks to avoid issues
+        if (sstarts[i] < sends[i]) and (sends[i] <= scov.shape[0]) and (sstarts[i] <= scov.shape[0]) and (sstarts[i] >= 0) and (sends[i] >= 0):
             for j in range(sstarts[i], sends[i]):
                 scov[j] += 1
-
     # Returned by reference
 
 
@@ -410,7 +409,7 @@ def load_diamond_blast6_lowmem(
 
     logging.info("Subject Lengths ordering..")
     slen_dict = {
-        r[1]: r[3]
+        r[1]: r[2]
         for r in aln
     }
     slens = [
