@@ -345,23 +345,28 @@ class FAMLI2():
 
 
 def load_diamond_blast6_lowmem(
-        file,
-        columns=[
-            "qseqid",
-            "sseqid",
-            "pident",
-            "length",
-            "mismatch",
-            "gapopen",
-            "qstart",
-            "qend",
-            "sstart",
-            "send",
-            "evalue",
-            "bitscore",
-            "qlen",
-            "slen"
-        ]):
+    file,
+    columns=[
+        "qseqid",
+        "sseqid",
+        "pident",
+        "length",
+        "mismatch",
+        "gapopen",
+        "qstart",
+        "qend",
+        "sstart",
+        "send",
+        "evalue",
+        "bitscore",
+        "qlen",
+        "slen"
+    ],
+    SD_MEAN_CUTOFF=1.0,
+    STRIM_5=18,
+    STRIM_3=18,
+    ALN_SCORE_SCALE=0.9,
+):
     logging.info("Attempting to open alignment file")
     if file.endswith('.gz') or file.endswith('.gzip'):
         fh = gzip.open(file, 'rt')
@@ -435,7 +440,11 @@ def load_diamond_blast6_lowmem(
             )
             for r in aln
 
-        ]
+        ],
+        SD_MEAN_CUTOFF=SD_MEAN_CUTOFF,
+        STRIM_5=STRIM_5,
+        STRIM_3=STRIM_3,
+        ALN_SCORE_SCALE=ALN_SCORE_SCALE,
     )
 
 
@@ -518,9 +527,13 @@ def main():
                         type=str,
                         help="""(Optional) Write log to this file.""")
     parser.add_argument("--sd-mean-cutoff",
-                        default=1.0,
+                        default=4.0,
                         type=float,
                         help="""Threshold for filtering max SD / MEAN""")
+    parser.add_argument("--aln_score_scale",
+                        default=0.8,
+                        type=float,
+                        help="""Threshold relative to max for bitscore filtering. (Default 0.9)""")
     parser.add_argument("--strim-5",
                         default=18,
                         type=int,
@@ -529,6 +542,7 @@ def main():
                         default=18,
                         type=int,
                         help="""Amount to trim from 3' end of subject""")
+
 
     args = parser.parse_args()
 
@@ -571,7 +585,13 @@ def main():
     rootLogger.addHandler(consoleHandler)
 
     logging.info("Attemping to load input file")
-    famli2 = load_diamond_blast6_lowmem(args.input)
+    famli2 = load_diamond_blast6_lowmem(
+        args.input,
+        SD_MEAN_CUTOFF=args.sd_mean_cutoff,
+        STRIM_5=args.strim_5,
+        STRIM_3=args.strim_3,
+        ALN_SCORE_SCALE=args.aln_score_scale,
+    )
 
     logging.info("Starting FAMLI (v1) filter")
     famli2.run_famli()
