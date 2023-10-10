@@ -608,7 +608,7 @@ def main():
             )
 
     elapsed = round(time.time() - start_time, 2)
-    logging.info("Time elapsed: {:,}".format(elapsed))
+    logging.info("Time elapsed: {:,} seconds".format(elapsed))
 
 
 if __name__ == "__main__":
