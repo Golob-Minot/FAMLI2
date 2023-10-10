@@ -4,13 +4,13 @@ import anndata as ad
 import numpy as np
 import logging
 import argparse
-import sys
 import os
 import time
 import gzip
 import json
 import csv
 import taichi as ti
+import importlib
 
 
 # Taichi methods...
@@ -565,6 +565,10 @@ def main():
     os.environ["NUMEXPR_NUM_THREADS"] = str(
         int(args.threads)
     )
+    importlib.reload(np)
+    importlib.reload(scipy)
+    importlib.reload(pd)
+    importlib.reload(ad)
     ti.init(
         cpu_max_num_threads=int(args.threads)
     )
