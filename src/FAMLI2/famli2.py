@@ -531,7 +531,7 @@ def main():
                         type=float,
                         help="""Threshold for filtering max SD / MEAN""")
     parser.add_argument("--aln_score_scale",
-                        default=0.8,
+                        default=0.9,
                         type=float,
                         help="""Threshold relative to max for bitscore filtering. (Default 0.9)""")
     parser.add_argument("--strim-5",
