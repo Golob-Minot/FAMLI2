@@ -77,7 +77,7 @@ class FAMLI2():
                     len(queries),
                 ),
                 dtype=bool
-            ).todense(),
+            ).tocsr(),
             obs=pd.DataFrame(index=subjects),
             var=pd.DataFrame(index=queries),
         )
@@ -160,6 +160,7 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
+
         # Densify and flatten
         sstarts = np.ravel(sstarts.astype(np.int32).toarray())
         sends = np.ravel(sends.astype(np.int32).toarray())
@@ -186,7 +187,6 @@ class FAMLI2():
 
     def coverage_filter(self):
         logging.info("Starting Coverage Filter")
-        # Add a column to our obs (subjects) if they passed
         self.aln_ad.obs['coverage_filter_pass'] = [
             self.subject_coverage_filter(
                 slen,
@@ -202,13 +202,16 @@ class FAMLI2():
                 self.aln_ad.layers['send'],
             )
         ]
+
         logging.info("Applying coverage filter results")
 
         # Do a bit of conversion here to deal with which sparse formats work the best
-
-        self.aln_ad.X[
+        new_mask = self.aln_ad.X.tolil()
+        new_mask[
             ~self.aln_ad.obs.coverage_filter_pass
         ] = False
+        # Convert back
+        self.aln_ad.X = new_mask.tocsr()
 
         logging.info("Completed Coverage Filter")
         self.apply_mask()
@@ -232,9 +235,9 @@ class FAMLI2():
         max_score_per_query = max_score_per_query.clip(
             min=max_score_per_query[max_score_per_query > 0].min() / 10
         )
-        self.aln_ad.X = (self.aln_ad.X & (
+        self.aln_ad.X = (self.aln_ad.X.multiply(
             self.aln_ad.layers['aln_score'].multiply(1 / max_score_per_query) >= self.ALN_SCORE_SCALE
-        ).todense())
+        )).tocsr()
         self.apply_mask()
         self.update_mapping_state()
 
@@ -542,7 +545,6 @@ def main():
                         default=18,
                         type=int,
                         help="""Amount to trim from 3' end of subject""")
-
 
     args = parser.parse_args()
 
