@@ -160,7 +160,7 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-
+        
         # Densify and flatten
         sstarts = np.ravel(sstarts.astype(np.int32).toarray())
         sends = np.ravel(sends.astype(np.int32).toarray())
@@ -202,16 +202,12 @@ class FAMLI2():
                 self.aln_ad.layers['send'],
             )
         ]
-
+        
         logging.info("Applying coverage filter results")
 
-        # Do a bit of conversion here to deal with which sparse formats work the best
-        new_mask = self.aln_ad.X.tolil()
-        new_mask[
-            ~self.aln_ad.obs.coverage_filter_pass
-        ] = False
-        # Convert back
-        self.aln_ad.X = new_mask.tocsr()
+        self.aln_ad.X = self.aln_ad.X.T.multiply(
+            self.aln_ad.obs.coverage_filter_pass
+        ).T.tocsr()
 
         logging.info("Completed Coverage Filter")
         self.apply_mask()
