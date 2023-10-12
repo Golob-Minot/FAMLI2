@@ -65,6 +65,7 @@ dependencies = [
   'numpy>=1.25.2',
   "pandas>=2.1.1",
   'scipy>=1.11.3',
+  'taichi>=1.6.0',
 ]
 
 
