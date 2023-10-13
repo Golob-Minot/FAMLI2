@@ -12,5 +12,11 @@ def test_load_diamond_blast6():
     # Assert that the function returns an instance of FAMLI2
     assert isinstance(result, FAMLI2)
 
+    # Reads are aligned to multiple references
+    assert result.aln_ad.var['n_subj_per_read'].max() > 1
+
     # Run the FAMLI analysis
     result.run_famli()
+
+    # Reads are aligned uniquely to a single reference
+    assert result.aln_ad.var['n_subj_per_read'].max() == 1
