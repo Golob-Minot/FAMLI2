@@ -1,16 +1,17 @@
-import scipy
-import pandas as pd
 import anndata as ad
-import numpy as np
-import logging
 import argparse
-import os
-import time
-import gzip
-import json
 import csv
-import taichi as ti
+import gzip
 import importlib
+import json
+import logging
+import numpy as np
+import os
+import pandas as pd
+import scipy
+import taichi as ti
+import time
+from typing import List
 
 
 # Taichi methods...
@@ -23,13 +24,26 @@ def make_subject_coverage_ti(
     # Make the cover-o-gram
     for i in range(sstarts.shape[0]):
         # Quite a few sanity / safety checks to avoid issues
-        if (sstarts[i] < sends[i]) and (sends[i] <= scov.shape[0]) and (sstarts[i] <= scov.shape[0]) and (sstarts[i] >= 0) and (sends[i] >= 0):
+        if (
+            (sstarts[i] < sends[i]) and
+            (sends[i] <= scov.shape[0]) and
+            (sstarts[i] <= scov.shape[0]) and
+            (sstarts[i] >= 0) and
+            (sends[i] >= 0)
+        ):
             for j in range(sstarts[i], sends[i]):
                 scov[j] += 1
     # Returned by reference
 
 
 class FAMLI2():
+
+    aln_ad: ad.AnnData
+    SD_MEAN_CUTOFF: float
+    STRIM_5: int
+    STRIM_3: int
+    ALN_SCORE_SCALE: float
+
     def __init__(
         self,
         subjects=list(),
@@ -42,16 +56,16 @@ class FAMLI2():
         ALN_SCORE_SCALE=0.9,
     ):
         """
-            Most often invoked indirectly via a loader.
-            subjects: A list of unique subject IDs corresponding to possible 'protein coding sequences'
-            queries: A list of unique query IDs corresponding to observed short reads.
-            slens: A list of integers corresponding to the subject lengths. Should be the same order and length
-                    as subjects as above. Failure to do so will result in an assertion error
-            alignments: A list of tuples: [
-                (subject_index, query_index, sstart, send, bitscore)
-                    0             1            2       3    4
-            ]
-            subject/query index is the index into subject / query lists as above...
+        Most often invoked indirectly via a loader.
+        subjects: A list of unique subject IDs corresponding to possible 'protein coding sequences'
+        queries: A list of unique query IDs corresponding to observed short reads.
+        slens: A list of integers corresponding to the subject lengths. Should be the same order and length
+                as subjects as above. Failure to do so will result in an assertion error
+        alignments: A list of tuples: [
+            (subject_index, query_index, sstart, send, bitscore)
+                0             1            2       3    4
+        ]
+        subject/query index is the index into subject / query lists as above...
         """
         # Store some hyperparamters
         self.SD_MEAN_CUTOFF = SD_MEAN_CUTOFF
@@ -160,7 +174,7 @@ class FAMLI2():
         strim_3,
         sd_mean_cutoff
     ):
-        
+
         # Densify and flatten
         sstarts = np.ravel(sstarts.astype(np.int32).toarray())
         sends = np.ravel(sends.astype(np.int32).toarray())
@@ -202,7 +216,7 @@ class FAMLI2():
                 self.aln_ad.layers['send'],
             )
         ]
-        
+
         logging.info("Applying coverage filter results")
 
         self.aln_ad.X = self.aln_ad.X.T.multiply(
@@ -216,31 +230,70 @@ class FAMLI2():
     # -- Bitscore filter -- #
     def bitscore_filter_iteration(self):
         # Generate a current 'subject weights' based on the alignment scores...
-        self.aln_ad.obs['s_weight'] = np.ravel(self.aln_ad.layers['aln_score'].sum(axis=1)) / self.aln_ad.obs.slen
-        # Then adjust the aln_score based on these revised weights
-        self.aln_ad.layers['aln_score'] = self.aln_ad.layers['aln_score'].T.multiply(
-            self.aln_ad.obs['s_weight']
-        ).T
-        # Renormalize the scores to sum up to 1
-        self.aln_ad.layers['aln_score'] = self.aln_ad.layers['aln_score'] / self.aln_ad.layers['aln_score'].sum(axis=0)
-        # The actual filter step in which we take normalize each alignment score to the max
-        # for this read (query / var) and then only keep those that are above the ALN_SCORE_SCALE threshold..
+        self.aln_ad.obs['s_weight'] = (
+            np.ravel(
+                self.aln_ad.layers['aln_score'].sum(axis=1)
+            ) /
+            self.aln_ad.obs.slen
+        )
 
-        # self.aln_ad.layers['aln_score'].max(axis=0).toarray()
-        max_score_per_query = self.aln_ad.layers['aln_score'].max(axis=0).toarray()
+        # Then adjust the aln_score based on these revised weights
+        self.aln_ad.layers['aln_score'] = (
+            self.aln_ad
+            .layers['aln_score']
+            .T
+            .multiply(
+                self.aln_ad.obs['s_weight']
+            )
+            .T
+        )
+
+        # Renormalize the scores to sum up to 1
+        self.aln_ad.layers['aln_score'] = (
+            self.aln_ad
+            .layers['aln_score'] /
+            self.aln_ad
+            .layers['aln_score']
+            .sum(axis=0)
+        )
+
+        # The actual filter step in which we take normalize
+        # each alignment score to the max
+        # for this read (query / var) and then only keep those
+        # that are above the ALN_SCORE_SCALE threshold..
+
+        max_score_per_query = (
+            self.aln_ad
+            .layers['aln_score']
+            .max(axis=0)
+            .toarray()
+        )
+
         max_score_per_query = max_score_per_query.clip(
             min=max_score_per_query[max_score_per_query > 0].min() / 10
         )
-        self.aln_ad.X = (self.aln_ad.X.multiply(
-            self.aln_ad.layers['aln_score'].multiply(1 / max_score_per_query) >= self.ALN_SCORE_SCALE
-        )).tocsr()
+
+        self.aln_ad.X = (
+            self.aln_ad
+            .X
+            .multiply(
+                self.aln_ad
+                .layers['aln_score']
+                .multiply(1 / max_score_per_query)
+                >= self.ALN_SCORE_SCALE
+            )
+        ).tocsr()
+
         self.apply_mask()
         self.update_mapping_state()
 
     def bitscore_filter(self, MAX_ITERATIONS=1000):
         logging.info("Starting bitscore filter (Iterative)")
         # Initialize an alignment score based on the bitscores
-        self.aln_ad.layers['aln_score'] = self.aln_ad.layers['bitscore'] / self.aln_ad.layers['bitscore'].sum(axis=0)
+        self.aln_ad.layers['aln_score'] = (
+            self.aln_ad.layers['bitscore'] /
+            self.aln_ad.layers['bitscore'].sum(axis=0)
+        )
 
         ix = 0
         while ix < MAX_ITERATIONS:
@@ -289,11 +342,23 @@ class FAMLI2():
         logging.info("Applying mask to alignments")
         # And then apply our mask...
 
-        self.aln_ad.layers['bitscore'] = self.aln_ad.layers['bitscore'].multiply(self.aln_ad.X).tocsr()
-        self.aln_ad.layers['sstart'] = self.aln_ad.layers['sstart'].multiply(self.aln_ad.X).tocsr()
-        self.aln_ad.layers['send'] = self.aln_ad.layers['send'].multiply(self.aln_ad.X).tocsr()
+        self.aln_ad.layers['bitscore'] = (
+            self.aln_ad.layers['bitscore']
+            .multiply(self.aln_ad.X)
+            .tocsr()
+        )
+        self.aln_ad.layers['sstart'] = (
+            self.aln_ad.layers['sstart']
+            .multiply(self.aln_ad.X)
+            .tocsr()
+        )
+        self.aln_ad.layers['send'] = (
+            self.aln_ad.layers['send']
+            .multiply(self.aln_ad.X)
+            .tocsr()
+        )
 
-    def output_list(self):
+    def output_list(self) -> List[dict]:
         logging.info("Filtering down to the final alignment")
         final_aln = self.aln_ad[self.aln_ad.obs.nreads > 0]
 
@@ -344,8 +409,8 @@ class FAMLI2():
 
 
 def load_diamond_blast6_lowmem(
-    file,
-    columns=[
+    file: str,
+    columns: List[str] = [
         "qseqid",
         "sseqid",
         "pident",
@@ -361,11 +426,11 @@ def load_diamond_blast6_lowmem(
         "qlen",
         "slen"
     ],
-    SD_MEAN_CUTOFF=1.0,
-    STRIM_5=18,
-    STRIM_3=18,
-    ALN_SCORE_SCALE=0.9,
-):
+    SD_MEAN_CUTOFF: float = 1.0,
+    STRIM_5: int = 18,
+    STRIM_3: int = 18,
+    ALN_SCORE_SCALE: float = 0.9,
+) -> FAMLI2:
     logging.info("Attempting to open alignment file")
     if file.endswith('.gz') or file.endswith('.gzip'):
         fh = gzip.open(file, 'rt')
@@ -447,7 +512,7 @@ def load_diamond_blast6_lowmem(
     )
 
 
-def load_diamond_blast6(file):
+def load_diamond_blast6(file: str) -> FAMLI2:
     logging.info("Using pandas to load blast6 format alignment")
     aln = pd.read_csv(
         file,
